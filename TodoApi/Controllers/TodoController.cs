@@ -1,122 +1,132 @@
 using Microsoft.AspNetCore.Mvc;
+using TodoApi.Interfaces;
 using TodoApi.Models;
-using TodoApi.Services;
 
 namespace TodoApi.Controllers
 {
     [ApiController]
-    [Route("api")]
+    [Route("api/[controller]")]
     public class TodoController : ControllerBase
     {
-        public TodoController()
+        private readonly ITodoService _todoService;
+        private readonly ILogger<TodoController> _logger;
+
+        public TodoController(
+            ITodoService todoService,
+            ILogger<TodoController> logger)
         {
+            _todoService = todoService;
+            _logger = logger;
         }
 
-        [HttpPost("createTodo")]
-        public IActionResult CreateTodo([FromBody] Todo todo)
+        [HttpPost]
+        public async Task<IActionResult> CreateTodo([FromBody] Todo todo)
         {
             try
             {
-                var todoService = new TodoService();
-                var result = todoService.CreateTodo(todo);
+                var result = await _todoService.CreateTodo(todo);
+                if (todo == null)
+                    return BadRequest("Unable to create todo");
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                _logger.LogError(ex, "Error while creating todo.");
+
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    "An error occurred while processing your request.");
             }
         }
 
-        [HttpPost("getTodo")]
-        public IActionResult GetTodo([FromBody] GetTodoRequest request)
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetTodo(int id)
         {
             try
             {
-                var todoService = new TodoService();
-                if (request.Id.HasValue)
-                {
-                    var todo = todoService.GetTodoById(request.Id.Value);
-                    if (todo == null)
-                    {
-                        return NotFound();
-                    }
-                    return Ok(todo);
-                }
-                else
-                {
-                    var todos = todoService.GetAllTodos();
-                    return Ok(todos);
-                }
+                var todo = await _todoService.GetTodoById(id);
+
+                if (todo == null)
+                    return NotFound($"Todo with Id {id} not found.");
+
+                return Ok(todo);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                _logger.LogError(ex, "Error while getting todo.");
+
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    "An error occurred while processing your request.");
             }
         }
 
-        [HttpPost("updateTodo")]
-        public IActionResult UpdateTodo([FromBody] UpdateTodoRequest request)
+        [HttpGet]
+        public async Task<IActionResult> GetAllTodo()
         {
             try
             {
-                var todoService = new TodoService();
-                var existingTodo = todoService.GetTodoById(request.Id);
-                if (existingTodo == null)
-                {
-                    return NotFound();
-                }
+                var todos = await _todoService.GetAllTodos();
 
-                var todo = new Todo
-                {
-                    Title = request.Title,
-                    Description = request.Description,
-                    IsCompleted = request.IsCompleted
-                };
-
-                var result = todoService.UpdateTodo(request.Id, todo);
-                return Ok(result);
+                return Ok(todos);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                _logger.LogError(ex, "Error while getting todos.");
+
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    "An error occurred while processing your request.");
             }
         }
 
-        [HttpPost("deleteTodo")]
-        public IActionResult DeleteTodo([FromBody] DeleteTodoRequest request)
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateTodo(
+            int id,
+            [FromBody] Todo todo)
         {
             try
             {
-                var todoService = new TodoService();
-                var result = todoService.DeleteTodo(request.Id);
-                if (result)
-                {
-                    return Ok(new { message = "Todo deleted successfully" });
-                }
-                return NotFound();
+                var updatedTodo = await _todoService.UpdateTodo(id, todo);
+
+                if (updatedTodo == null)
+                    return NotFound($"Todo with Id {id} not found.");
+
+                return Ok(updatedTodo);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                _logger.LogError(ex, "Error while updating todo.");
+
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    "An error occurred while processing your request.");
             }
         }
-    }
 
-    public class GetTodoRequest
-    {
-        public int? Id { get; set; }
-    }
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteTodo(int id)
+        {
+            try
+            {
+                var deleted = await _todoService.DeleteTodo(id);
 
-    public class UpdateTodoRequest
-    {
-        public int Id { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public bool IsCompleted { get; set; }
-    }
+                if (!deleted)
+                    return NotFound($"Todo with Id {id} not found.");
 
-    public class DeleteTodoRequest
-    {
-        public int Id { get; set; }
+                return Ok(new
+                {
+                    Message = "Todo deleted successfully."
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while deleting todo.");
+
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    "An error occurred while processing your request.");
+            }
+        }
     }
 }

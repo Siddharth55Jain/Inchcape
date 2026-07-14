@@ -1,18 +1,25 @@
 using Microsoft.Data.Sqlite;
+using TodoApi;
+using TodoApi.Interfaces;
+using TodoApi.Repositories;
+using TodoApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Dependency Injection
+builder.Services.AddScoped<ITodoRepository, TodoRepository>();
+builder.Services.AddScoped<ITodoService, TodoService>();
 
 var app = builder.Build();
 
 InitializeDatabase();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -27,23 +34,29 @@ app.MapControllers();
 
 app.Run();
 
-void InitializeDatabase()
+static void InitializeDatabase()
 {
-    var connectionString = "Data Source=todos.db";
-    using var connection = new SqliteConnection(connectionString);
-    connection.Open();
+    string connectionString = AWSSecretManager.ConnString;
 
-    var command = connection.CreateCommand();
-    command.CommandText = @"
-        CREATE TABLE IF NOT EXISTS Todos (
-            Id INTEGER PRIMARY KEY AUTOINCREMENT,
-            Title TEXT NOT NULL,
-            Description TEXT,
-            IsCompleted INTEGER NOT NULL DEFAULT 0,
-            CreatedAt TEXT NOT NULL
-        )
-    ";
-    command.ExecuteNonQuery();
+    using (var connection = new SqliteConnection(connectionString))
+    {
+        connection.Open();
 
-    Console.WriteLine("Database initialized successfully");
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = @"
+                CREATE TABLE IF NOT EXISTS Todos
+                (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Title TEXT NOT NULL,
+                    Description TEXT,
+                    IsCompleted INTEGER NOT NULL DEFAULT 0,
+                    CreatedAt TEXT NOT NULL
+                );";
+
+            command.ExecuteNonQuery();
+        }
+    }
+
+    Console.WriteLine("Database initialized successfully.");
 }

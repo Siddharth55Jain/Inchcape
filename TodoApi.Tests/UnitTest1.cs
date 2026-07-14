@@ -1,95 +1,134 @@
-using Xunit;
-using TodoApi.Services;
+using TodoApi.Interfaces;
 using TodoApi.Models;
-using TodoApi.Controllers;
-using Microsoft.AspNetCore.Mvc;
+using TodoApi.Services;
+using Xunit;
 
-namespace TodoApi.Tests;
-
-public class UnitTest1
+namespace TodoApi.Tests
 {
-    [Fact]
-    public void Test1()
+    public class UnitTest1
     {
-        var service = new TodoService();
-        Assert.True(true);
+        private readonly TodoService _service;
+
+        public UnitTest1()
+        {
+            _service = new TodoService(new FakeTodoRepository());
+        }
+
+        [Fact]
+        public async Task CreateTodo_Test()
+        {
+            var todo = new Todo
+            {
+                Title = "Test",
+                Description = "Description",
+                IsCompleted = false
+            };
+
+            var result = await _service.CreateTodo(todo);
+
+            Assert.NotNull(result);
+            Assert.Equal("Test", result.Title);
+        }
+
+        [Fact]
+        public async Task GetTodoById_Test()
+        {
+            var result = await _service.GetTodoById(1);
+
+            Assert.NotNull(result);
+            Assert.Equal(1, result.Id);
+        }
+
+        [Fact]
+        public async Task GetAllTodos_Test()
+        {
+            var result = await _service.GetAllTodos();
+
+            Assert.True(result.Count > 0);
+        }
+
+        [Fact]
+        public async Task UpdateTodo_Test()
+        {
+            var todo = new Todo
+            {
+                Title = "Updated",
+                Description = "Updated Description",
+                IsCompleted = true
+            };
+
+            var result = await _service.UpdateTodo(1, todo);
+
+            Assert.NotNull(result);
+            Assert.Equal("Updated", result.Title);
+        }
+
+        [Fact]
+        public async Task DeleteTodo_Test()
+        {
+            var result = await _service.DeleteTodo(1);
+
+            Assert.True(result);
+        }
     }
 
-    [Fact]
-    public void TestCreateTodo()
+    internal class FakeTodoRepository : ITodoRepository
     {
-        var service = new TodoService();
-        var todo = new Todo
+        private readonly List<Todo> _todos = new()
         {
-            Title = "Test",
-            Description = "Test Description",
-            IsCompleted = false
+            new Todo
+            {
+                Id = 1,
+                Title = "Sample",
+                Description = "Sample Description",
+                IsCompleted = false,
+                CreatedAt = DateTime.UtcNow
+            }
         };
 
-        var result = service.CreateTodo(todo);
-
-        Assert.NotNull(result);
-        Assert.True(result.Id > 0);
-    }
-
-    [Fact]
-    public void TestGetTodo()
-    {
-        var service = new TodoService();
-        var todos = service.GetAllTodos();
-
-        Assert.True(todos.Count > 0);
-    }
-
-    [Fact]
-    public void UpdateTest()
-    {
-        var service = new TodoService();
-        var todo = new Todo
+        public Task<Todo> CreateTodo(Todo todo)
         {
-            Title = "Updated",
-            Description = "Updated Description",
-            IsCompleted = true
-        };
+            todo.Id = _todos.Count + 1;
+            todo.CreatedAt = DateTime.UtcNow;
+            _todos.Add(todo);
 
-        var result = service.UpdateTodo(1, todo);
-        Assert.NotNull(result);
-    }
+            return Task.FromResult(todo);
+        }
 
-    [Fact]
-    public void DeleteWorks()
-    {
-        var service = new TodoService();
-        var result = service.DeleteTodo(999);
+        public Task<List<Todo>> GetAllTodos()
+        {
+            return Task.FromResult(_todos);
+        }
 
-        Assert.False(result);
-    }
+        public Task<Todo?> GetTodoById(int id)
+        {
+            return Task.FromResult(_todos.FirstOrDefault(x => x.Id == id));
+        }
 
-    [Fact]
-    public void ControllerTest()
-    {
-        var controller = new TodoController();
-        var todo = new Todo { Title = "Test", Description = "Desc" };
+        public Task<bool> UpdateTodo(Todo todo)
+        {
+            var existing = _todos.FirstOrDefault(x => x.Id == todo.Id);
 
-        var result = controller.CreateTodo(todo);
+            if (existing == null)
+                return Task.FromResult(false);
 
-        Assert.NotNull(result);
-    }
+            existing.Title = todo.Title;
+            existing.Description = todo.Description;
+            existing.IsCompleted = todo.IsCompleted;
 
-    [Fact]
-    public void TestEverything()
-    {
-        var service = new TodoService();
+            return Task.FromResult(true);
+        }
 
-        var todo1 = service.CreateTodo(new Todo { Title = "1", Description = "D1" });
-        var todo2 = service.CreateTodo(new Todo { Title = "2", Description = "D2" });
+        public Task<bool> DeleteTodo(int id)
+        {
+            var todo = _todos.FirstOrDefault(x => x.Id == id);
 
-        var all = service.GetAllTodos();
+            if (todo == null)
+                return Task.FromResult(false);
 
-        service.UpdateTodo(todo1.Id, new Todo { Title = "Updated", Description = "D1" });
+            _todos.Remove(todo);
 
-        service.DeleteTodo(todo2.Id);
-
-        Assert.True(all.Count >= 2);
+            return Task.FromResult(true);
+        }
     }
 }
