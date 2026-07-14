@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using TodoApi;
 using TodoApi.Interfaces;
+using TodoApi.Middlewares;
 using TodoApi.Repositories;
 using TodoApi.Services;
 
@@ -18,7 +19,6 @@ builder.Services.AddScoped<ITodoService, TodoService>();
 
 var app = builder.Build();
 
-InitializeDatabase();
 
 if (app.Environment.IsDevelopment())
 {
@@ -27,36 +27,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseRequestValidation();
 
 app.UseAuthorization();
 
 app.MapControllers();
 
 app.Run();
-
-static void InitializeDatabase()
-{
-    string connectionString = AWSSecretManager.ConnString;
-
-    using (var connection = new SqliteConnection(connectionString))
-    {
-        connection.Open();
-
-        using (var command = connection.CreateCommand())
-        {
-            command.CommandText = @"
-                CREATE TABLE IF NOT EXISTS Todos
-                (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Title TEXT NOT NULL,
-                    Description TEXT,
-                    IsCompleted INTEGER NOT NULL DEFAULT 0,
-                    CreatedAt TEXT NOT NULL
-                );";
-
-            command.ExecuteNonQuery();
-        }
-    }
-
-    Console.WriteLine("Database initialized successfully.");
-}

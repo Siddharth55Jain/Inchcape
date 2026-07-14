@@ -1,134 +1,183 @@
-using TodoApi.Interfaces;
-using TodoApi.Models;
-using TodoApi.Services;
 using Xunit;
+using TodoApi.Services;
+using TodoApi.Repositories;
+using TodoApi.Models;
 
-namespace TodoApi.Tests
+namespace TodoApi.Tests;
+
+public class UnitTest1
 {
-    public class UnitTest1
+    private readonly TodoService _service;
+
+    public UnitTest1()
     {
-        private readonly TodoService _service;
-
-        public UnitTest1()
-        {
-            _service = new TodoService(new FakeTodoRepository());
-        }
-
-        [Fact]
-        public async Task CreateTodo_Test()
-        {
-            var todo = new Todo
-            {
-                Title = "Test",
-                Description = "Description",
-                IsCompleted = false
-            };
-
-            var result = await _service.CreateTodo(todo);
-
-            Assert.NotNull(result);
-            Assert.Equal("Test", result.Title);
-        }
-
-        [Fact]
-        public async Task GetTodoById_Test()
-        {
-            var result = await _service.GetTodoById(1);
-
-            Assert.NotNull(result);
-            Assert.Equal(1, result.Id);
-        }
-
-        [Fact]
-        public async Task GetAllTodos_Test()
-        {
-            var result = await _service.GetAllTodos();
-
-            Assert.True(result.Count > 0);
-        }
-
-        [Fact]
-        public async Task UpdateTodo_Test()
-        {
-            var todo = new Todo
-            {
-                Title = "Updated",
-                Description = "Updated Description",
-                IsCompleted = true
-            };
-
-            var result = await _service.UpdateTodo(1, todo);
-
-            Assert.NotNull(result);
-            Assert.Equal("Updated", result.Title);
-        }
-
-        [Fact]
-        public async Task DeleteTodo_Test()
-        {
-            var result = await _service.DeleteTodo(1);
-
-            Assert.True(result);
-        }
+        var repository = new TodoRepository();
+        _service = new TodoService(repository);
     }
 
-    internal class FakeTodoRepository : ITodoRepository
+    [Fact]
+    public async Task TestCreateTodo()
     {
-        private readonly List<Todo> _todos = new()
+        var todo = new Todo
         {
-            new Todo
-            {
-                Id = 1,
-                Title = "Sample",
-                Description = "Sample Description",
-                IsCompleted = false,
-                CreatedAt = DateTime.UtcNow
-            }
+            Title = "Test Todo",
+            Description = "Test Description",
+            IsCompleted = false
         };
 
-        public Task<Todo> CreateTodo(Todo todo)
+        var result = await _service.CreateTodo(todo);
+
+        Assert.NotNull(result);
+        Assert.True(result.Id > 0);
+        Assert.Equal("Test Todo", result.Title);
+    }
+
+    [Fact]
+    public async Task TestGetAllTodos()
+    {
+        var todos = await _service.GetAllTodos();
+
+        Assert.NotNull(todos);
+    }
+
+    [Fact]
+    public async Task TestGetTodoById()
+    {
+        var created = await _service.CreateTodo(new Todo
         {
-            todo.Id = _todos.Count + 1;
-            todo.CreatedAt = DateTime.UtcNow;
-            _todos.Add(todo);
+            Title = "Get Todo",
+            Description = "Testing"
+        });
 
-            return Task.FromResult(todo);
-        }
+        var todo = await _service.GetTodoById(created.Id);
 
-        public Task<List<Todo>> GetAllTodos()
+        Assert.NotNull(todo);
+        Assert.Equal(created.Id, todo.Id);
+    }
+
+    [Fact]
+    public async Task TestUpdateTodo()
+    {
+        var created = await _service.CreateTodo(new Todo
         {
-            return Task.FromResult(_todos);
-        }
+            Title = "Old Title",
+            Description = "Old Description"
+        });
 
-        public Task<Todo?> GetTodoById(int id)
+        var updatedTodo = new Todo
         {
-            return Task.FromResult(_todos.FirstOrDefault(x => x.Id == id));
-        }
+            Title = "New Title",
+            Description = "New Description",
+            IsCompleted = true
+        };
 
-        public Task<bool> UpdateTodo(Todo todo)
+        var result = await _service.UpdateTodo(created.Id, updatedTodo);
+
+        Assert.NotNull(result);
+        Assert.Equal("New Title", result.Title);
+        Assert.True(result.IsCompleted);
+    }
+
+    [Fact]
+    public async Task TestDeleteTodo()
+    {
+        var created = await _service.CreateTodo(new Todo
         {
-            var existing = _todos.FirstOrDefault(x => x.Id == todo.Id);
+            Title = "Delete Me",
+            Description = "Delete Test"
+        });
 
-            if (existing == null)
-                return Task.FromResult(false);
+        var deleted = await _service.DeleteTodo(created.Id);
 
-            existing.Title = todo.Title;
-            existing.Description = todo.Description;
-            existing.IsCompleted = todo.IsCompleted;
+        Assert.True(deleted);
+    }
 
-            return Task.FromResult(true);
-        }
+    [Fact]
+    public async Task GetTodo_InvalidId_ShouldReturnNull()
+    {
+        var todo = await _service.GetTodoById(-100);
 
-        public Task<bool> DeleteTodo(int id)
+        Assert.Null(todo);
+    }
+
+    [Fact]
+    public async Task UpdateTodo_InvalidId_ShouldReturnNull()
+    {
+        var todo = new Todo
         {
-            var todo = _todos.FirstOrDefault(x => x.Id == id);
+            Title = "Invalid",
+            Description = "Invalid"
+        };
 
-            if (todo == null)
-                return Task.FromResult(false);
+        var result = await _service.UpdateTodo(999999, todo);
 
-            _todos.Remove(todo);
+        Assert.Null(result);
+    }
 
-            return Task.FromResult(true);
-        }
+    [Fact]
+    public async Task DeleteTodo_InvalidId_ShouldReturnFalse()
+    {
+        var result = await _service.DeleteTodo(999999);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task CreateTodo_WithEmptyTitle_ShouldThrowException()
+    {
+        var todo = new Todo
+        {
+            Title = "",
+            Description = "Description"
+        };
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => _service.CreateTodo(todo));
+    }
+
+    [Fact]
+    public async Task CreateTodo_WithNullTitle_ShouldThrowException()
+    {
+        var todo = new Todo
+        {
+            Title = null,
+            Description = "Description"
+        };
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => _service.CreateTodo(todo));
+    }
+
+    [Fact]
+    public async Task TestCompleteCrudFlow()
+    {
+        var created = await _service.CreateTodo(new Todo
+        {
+            Title = "CRUD",
+            Description = "Flow"
+        });
+
+        Assert.True(created.Id > 0);
+
+        var fetched = await _service.GetTodoById(created.Id);
+
+        Assert.NotNull(fetched);
+
+        var updated = await _service.UpdateTodo(created.Id, new Todo
+        {
+            Title = "Updated CRUD",
+            Description = "Updated",
+            IsCompleted = true
+        });
+
+        Assert.NotNull(updated);
+
+        var deleted = await _service.DeleteTodo(created.Id);
+
+        Assert.True(deleted);
+
+        var deletedTodo = await _service.GetTodoById(created.Id);
+
+        Assert.Null(deletedTodo);
     }
 }

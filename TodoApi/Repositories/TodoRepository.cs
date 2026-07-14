@@ -6,8 +6,33 @@ namespace TodoApi.Repositories
 {
     public class TodoRepository : ITodoRepository
     {
+        public TodoRepository()
+        {
+            InitializeDatabase();
+        }
         private readonly string _connectionString = AWSSecretManager.ConnString;
+        private void InitializeDatabase()
+        {
+            using (var connection = new SqliteConnection(_connectionString))
+            {
+                connection.Open();
 
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+                CREATE TABLE IF NOT EXISTS Todos
+                (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Title TEXT NOT NULL,
+                    Description TEXT,
+                    IsCompleted INTEGER NOT NULL DEFAULT 0,
+                    CreatedAt TEXT NOT NULL
+                );";
+
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
         public async Task<Todo> CreateTodo(Todo todo)
         {
             await using (var connection = new SqliteConnection(_connectionString))

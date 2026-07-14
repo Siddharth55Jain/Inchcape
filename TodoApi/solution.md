@@ -226,6 +226,7 @@ If additional time were available, the following enhancements would be implement
 * Introduce a global exception handling middleware.
 * Used AWS Secrets Manager to save secrets
 * Add pagination, filtering, and sorting for retrieving TODO items.
+* Used Redis based caching mechanisms to improve performance for frequently accessed data.
 * Add authentication and authorization.
 * Add structured logging and application monitoring, like request and response monitoring via jaeger.
-* Add XML comments and Swagger annotations for improved API documentation.
+* Add Swagger annotations for improved API documentation.
